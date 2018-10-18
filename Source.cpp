@@ -7,10 +7,97 @@
 typedef struct edge
 {
 	cv::Point2d endpoints[2];
-	cv::Vec3f weights = cv::Vec3b(0, 0, 0); // in order b,g,r
+	cv::Vec3f weights = cv::Vec3f(0.0f, 0.0f, 0.0f); // in order b,g,r
 } edge;
 
-bool equal(edge e1, edge e2)
+typedef cv::Point3_<uint8_t> Pixel;
+
+class ImageSegmentation
+{
+public: 
+	cv::Mat &imgRef;
+	std::vector<edge> edges;
+	edge emptyEdge;
+
+	bool equal(edge e1, edge e2);
+	bool findInVector(std::vector<edge> edges, edge edgeToCheck);
+	void segment(cv::Mat img, std::vector<edge> edges);
+	ImageSegmentation(cv::Mat img); // constructor
+private: 
+
+};
+
+ImageSegmentation::ImageSegmentation(cv::Mat img) : edges (img.size().height * img.size().width, emptyEdge), imgRef (img)
+{
+	// initiate vector edges and fill it with all the edges and weight them and shit
+	img.forEach<Pixel>
+	(
+		[this](Pixel &pixel, const int * position) -> void
+		{
+		// create all of the vertices 
+		edge temp;
+		temp.endpoints[0].x = position[0];
+		temp.endpoints[0].y = position[1];
+		
+		// height = this->imgRef.row
+		// width = this->imgRef.col
+		// h = position[0]
+		// w = position[1]
+		
+		// up
+		temp.endpoints[1].x = position[0] - 1;
+		temp.endpoints[1].y = position[1];
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// diag.up.right
+		temp.endpoints[1].x = position[0] - 1;
+		temp.endpoints[1].y = position[1] + 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// right
+		temp.endpoints[1].x = position[0];
+		temp.endpoints[1].y = position[1] + 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// diag.down.right
+		temp.endpoints[1].x = position[0] + 1;
+		temp.endpoints[1].y = position[1] + 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// down
+		temp.endpoints[1].x = position[0] + 1;
+		temp.endpoints[1].y = position[1];
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// diag.down.left
+		temp.endpoints[1].x = position[0] + 1;
+		temp.endpoints[1].y = position[1] - 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// left
+		temp.endpoints[1].x = position[0];
+		temp.endpoints[1].y = position[1] - 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+		
+		//// diag.up.left
+		temp.endpoints[1].x = position[0] - 1;
+		temp.endpoints[1].y = position[1] - 1;
+		if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= this->imgRef.rows && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= this->imgRef.cols && !findInVector(edges, temp))
+			edges[position[0] * imgRef.cols + position[1]] = temp;
+
+		// weight all of the edges in all of the respective layers, less iterating to do it all at once
+		}
+	);
+}
+
+bool ImageSegmentation::equal(edge e1, edge e2)
 {
 	if (e1.endpoints[0] == e2.endpoints[0] && e1.endpoints[1] == e2.endpoints[1])
 		return true;
@@ -22,7 +109,7 @@ bool equal(edge e1, edge e2)
 		return false; 
 }
 
-bool findInVector(std::vector<edge> edges, edge edgeToCheck)
+bool ImageSegmentation::findInVector(std::vector<edge> edges, edge edgeToCheck)
 {
 	if (edges.size() == 0) return false; 
 
@@ -31,110 +118,6 @@ bool findInVector(std::vector<edge> edges, edge edgeToCheck)
 			return true; 
 
 	return false; 
-}
-
-typedef cv::Point3_<uint8_t> Pixel;
-
-// Parallel execution with function object.
-struct Operator
-{
-	void operator ()(Pixel &pixel, const int * position) const
-	{
-		//pixel.x = 255;
-		std::cout << "pixel.x = " << static_cast<int>(pixel.x) << "\t pixel.y = " << pixel.y << "\t pixel.z = " << pixel.z << "\t position[0] = " << position[0] << "\t position[1] = " << position[1] << "\t position[2] = " << position[2] << "\n";
-	}
-};
-
-// create the initial edges from the image
-std::vector<edge> createEdges(cv::Mat img, cv::Size size)
-{
-	std::vector<edge> edges;
-
-	img.forEach<Pixel>(Operator());
-
-	/*edge something; 
-	edges.push_back(something); */
-
-	// old try
-	/*int height = size.height;
-	int width = size.width;
-
-	// this will make it go row by row
-	for (int h = 0; h < height; h++)
-	{
-		for (int w = 0; w < width; w++)
-		{
-			edge temp; 
-			temp.endpoints[0].x = h;
-			temp.endpoints[0].y = w;
-
-			std::cout << "1 \n";
-
-			// up
-			temp.endpoints[1].x = h - 1;
-			temp.endpoints[1].y = w;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			std::cout << "2 \n";
-
-			//// diag.up.right
-			temp.endpoints[1].x = h - 1;
-			temp.endpoints[1].y = w + 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// right
-			temp.endpoints[1].x = h;
-			temp.endpoints[1].y = w + 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// diag.down.right
-			temp.endpoints[1].x = h + 1;
-			temp.endpoints[1].y = w + 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// down
-			temp.endpoints[1].x = h + 1;
-			temp.endpoints[1].y = w;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// diag.down.left
-			temp.endpoints[1].x = h + 1;
-			temp.endpoints[1].y = w - 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// left
-			temp.endpoints[1].x = h;
-			temp.endpoints[1].y = w - 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			//// diag.up.left
-			temp.endpoints[1].x = h - 1;
-			temp.endpoints[1].y = w - 1;
-			if (temp.endpoints[1].x >= 0 && temp.endpoints[1].x <= height && temp.endpoints[1].y >= 0 && temp.endpoints[1].y <= width && !findInVector(edges, temp))
-				edges.push_back(temp);
-
-			std::cout << "w = " << w << "\n";
-		}
-		std::cout << "h = " << h << "\n";
-	}*/
-
-	std::cout << "4 \n";
-	
-	return edges;
-}
-
-void weight_edges(cv::Mat img, std::vector<edge> *edges)
-{
-	// weights stuff, obviously
-	// forEach here
-	// how to access individual elements: (*edges)[0].
 }
 
 //std::vector<std::set<cv::Point2d>> segmentation_algorithm(cv::Mat img_layer, std::vector<edge> edges)
@@ -146,16 +129,8 @@ void segmentation_algorithm(cv::Mat img_layer, std::vector<edge> edges)
 
 // returns a list of sets of points (vertex positions) S = (C1, C2, C3, C4 ...) return S 
 //std::vector<std::set<cv::Point2d>> segment(cv::Mat img, std::vector<edge> edges)
-void segment(cv::Mat img, std::vector<edge> edges)
+void ImageSegmentation::segment(cv::Mat img, std::vector<edge> edges)
 {
-	// weight all of the edges in all of the respective layers, less iterating to do it all at once
-	weight_edges(img, &edges);
-
-	// split img into 3 "layers" of bgr parts
-	cv::Mat bgr[3];   //destination array
-	cv::split(img, bgr);//split source 
-	// bgr[3] now has each of the three bgr layers 
-
 	// do segmentation algorithm of each of the three images
 	// get an array of the three segmentations, std::vector<std::set<cv::Point2d>>[3], one for each of the layers
 
@@ -175,10 +150,10 @@ int main()
 	std::cout << "Loaded image \n";
 
 	// create an array of edges
-	std::vector<edge> edges = createEdges(img, img.size());
+	ImageSegmentation segmentation(img); 
 	// edges now contains all of the edges for the image
 
-	std::cout << "Size of vector of edges: " << edges.size() << "\n";
+	std::cout << "Size of vector of edges: " << segmentation.edges.size() << "\n";
 
 	// do gaussian blur on img here, 0.8 factor
 
