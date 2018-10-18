@@ -33,15 +33,30 @@ bool findInVector(std::vector<edge> edges, edge edgeToCheck)
 	return false; 
 }
 
+typedef cv::Point3_<uint8_t> Pixel;
+
+// Parallel execution with function object.
+struct Operator
+{
+	void operator ()(Pixel &pixel, const int * position) const
+	{
+		//pixel.x = 255;
+		std::cout << "pixel.x = " << static_cast<int>(pixel.x) << "\t pixel.y = " << pixel.y << "\t pixel.z = " << pixel.z << "\t position[0] = " << position[0] << "\t position[1] = " << position[1] << "\t position[2] = " << position[2] << "\n";
+	}
+};
+
 // create the initial edges from the image
-std::vector<edge> createEdges(cv::Size size)
+std::vector<edge> createEdges(cv::Mat img, cv::Size size)
 {
 	std::vector<edge> edges;
+
+	img.forEach<Pixel>(Operator());
 
 	/*edge something; 
 	edges.push_back(something); */
 
-	int height = size.height;
+	// old try
+	/*int height = size.height;
 	int width = size.width;
 
 	// this will make it go row by row
@@ -108,7 +123,7 @@ std::vector<edge> createEdges(cv::Size size)
 			std::cout << "w = " << w << "\n";
 		}
 		std::cout << "h = " << h << "\n";
-	}
+	}*/
 
 	std::cout << "4 \n";
 	
@@ -155,12 +170,12 @@ void colour_img(cv::Mat img, std::vector<std::set<cv::Point2d>> segmentation)
 
 int main()
 {
-	cv::Mat img = cv::imread("purple_flower.jpg");
+	cv::Mat img = cv::imread("orange_flower_small.jpg");
 
 	std::cout << "Loaded image \n";
 
 	// create an array of edges
-	std::vector<edge> edges = createEdges(img.size());
+	std::vector<edge> edges = createEdges(img, img.size());
 	// edges now contains all of the edges for the image
 
 	std::cout << "Size of vector of edges: " << edges.size() << "\n";
