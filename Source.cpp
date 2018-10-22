@@ -1,6 +1,7 @@
 #include<opencv2/opencv.hpp>
 #include<iostream>
 #include<limits>
+#include<set>
 
 #include"lib.h"
 
@@ -18,16 +19,23 @@ public:
 	cv::Mat &imgRef;
 	std::vector<edge> edges;
 	edge emptyEdge;
+	std::vector<std::vector<cv::Point2d>> segmentationB;
+	std::vector<std::vector<cv::Point2d>> segmentationG;
+	std::vector<std::vector<cv::Point2d>> segmentationR;
+	std::vector<cv::Point2d> emptyVec; 
 
-	bool equal(edge e1, edge e2);
-	bool findInVector(std::vector<edge> edges, edge edgeToCheck);
-	void segment(cv::Mat img, std::vector<edge> edges);
+	std::vector<std::vector<cv::Point2d>> segment(cv::Mat img, std::vector<edge> edges);
+	void colour_img(cv::Mat img, std::vector<std::vector<cv::Point2d>> segmentation);
 	ImageSegmentation(cv::Mat img); // constructor
 private: 
+	std::vector<std::vector<cv::Point2d>> segmentation_algorithm(std::vector<std::vector<cv::Point2d>> segmentation);
+	bool equal(edge e1, edge e2);
+	bool findInVector(std::vector<edge> edges, edge edgeToCheck);
 
 };
 
-ImageSegmentation::ImageSegmentation(cv::Mat img) : edges (img.size().height * img.size().width * 4, emptyEdge), imgRef (img)
+// constructor
+ImageSegmentation::ImageSegmentation(cv::Mat img) : edges (img.size().height * img.size().width * 4, emptyEdge), imgRef (img), segmentationB (img.cols * img.rows, emptyVec), segmentationG(img.cols * img.rows, emptyVec), segmentationR(img.cols * img.rows, emptyVec)
 {
 	// initiate vector edges and fill it with all the edges and weight them and shit
 	img.forEach<Pixel>
@@ -57,26 +65,24 @@ ImageSegmentation::ImageSegmentation(cv::Mat img) : edges (img.size().height * i
 					index++; 
 				}
 			}
+		int pos = this->imgRef.cols * position[0] + position[1];
+		segmentationB[pos] = segmentationG[pos] = segmentationR[pos] = std::vector<cv::Point2d>(1, temp.endpoints[0]);
 		}
 	);
 	// vector edges should now have all of the relevant edges with corresponding weights
 
 	std::cout << "Size of vector of edges before erasing: " << edges.size() << "\n";
-
-	// go through vector edges and remove all edges that have weight -1, they are empty 
-	// old, takes forever
+	// go through vector edges and remove all edges that have weight 0, they are empty 
 	cv::Vec3i tempVec = cv::Vec3i(0, 0, 0);
 	for (std::vector<edge>::iterator it = edges.begin(); it != edges.end(); )
 	{
 		if (it->weights == tempVec)
 		{
-			std::cout << "inside if \n";
 			it = edges.erase(it);
 		}
 		else 
 			++it;
 	}
-
 	std::cout << "Size of vector of edges after erasing: " << edges.size() << "\n";
 }
 
@@ -103,25 +109,35 @@ bool ImageSegmentation::findInVector(std::vector<edge> edges, edge edgeToCheck)
 	return false; 
 }
 
-//std::vector<std::set<cv::Point2d>> segmentation_algorithm(cv::Mat img_layer, std::vector<edge> edges)
-void segmentation_algorithm(cv::Mat img_layer, std::vector<edge> edges)
+std::vector<std::vector<cv::Point2d>> ImageSegmentation::segmentation_algorithm(std::vector<std::vector<cv::Point2d>> segmentation)
 {
 	// segmentation algorithm and stuff
 	// no forEach since it can not be done parallell 
+
+	//return a vector of sets of points
+	std::vector<std::vector<cv::Point2d>> randomCrap;
+	return randomCrap;
 }
 
-// returns a list of sets of points (vertex positions) S = (C1, C2, C3, C4 ...) return S 
-//std::vector<std::set<cv::Point2d>> segment(cv::Mat img, std::vector<edge> edges)
-void ImageSegmentation::segment(cv::Mat img, std::vector<edge> edges)
+// returns a list of sets of points (vertex positions) S = (C1, C2, C3, C4 ...), return S 
+std::vector<std::vector<cv::Point2d>> ImageSegmentation::segment(cv::Mat img, std::vector<edge> edges)
 {
 	// do segmentation algorithm of each of the three images
-	// get an array of the three segmentations, std::vector<std::set<cv::Point2d>>[3], one for each of the layers
+
+	std::vector<std::vector<std::vector<cv::Point2d>>> segmentations; 
+	segmentationB = segmentation_algorithm(segmentationB);
+	segmentationG = segmentation_algorithm(segmentationG);
+	segmentationR = segmentation_algorithm(segmentationR);
+	
+	// make intersection function
 
 	// do the intersection of the three segmentations -> final segmentation
-	// return the final segmentation
+	// return final segmentation
+	segmentations.push_back(segmentationB);
+	return segmentations[0];
 }
 
-void colour_img(cv::Mat img, std::vector<std::set<cv::Point2d>> segmentation)
+void ImageSegmentation::colour_img(cv::Mat img, std::vector<std::vector<cv::Point2d>> segmentation)
 {
 	// colour each component of the segmentation in a distinct colour
 }
@@ -140,12 +156,12 @@ int main()
 
 	// create an array of edges
 	ImageSegmentation segmentation(imgBlurred); 
-	// edges now contains all of the edges for the image
+	// edges now contains all of the edges with weights for the image
 
 	std::cout << "Size of image: " << img.size() << "\n";
 	
 	// do segmentation 
-	//std::vector<std::set<cv::Point2d>> segmentation = segment(img, edges);
+	std::vector<std::vector<cv::Point2d>> finalSegmentation = segmentation.segment(imgBlurred, segmentation.edges);
 
 	// "colour" and show the image
 	//colour_img(img, segmentation); 
