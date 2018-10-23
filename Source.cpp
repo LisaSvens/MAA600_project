@@ -124,11 +124,10 @@ void ImageSegmentation::sortEdgesByEdgeWeight(int layer)
 	};
 	std::sort(edges.begin(), edges.end(), comparison);
 
-	std::cout << "sorted edges contains: \n";
-	for (int a = 0; a < 50; a++)
-		std::cout << edges[a].weights << " ";
+	std::cout << "edges sorted \n";
 
 	intC = std::vector<int>(edges.size(), 0);
+	std::cout << "vector intC initialized \n";
 }
 
 cv::Point2i ImageSegmentation::inSame(std::vector<std::vector<cv::Point2d>> segmentation, cv::Point2d pt1, cv::Point2d pt2)
@@ -156,8 +155,7 @@ cv::Point2i ImageSegmentation::inSame(std::vector<std::vector<cv::Point2d>> segm
 
 double ImageSegmentation::tau(int componentSize)
 {
-	int k = 300;
-	return k / componentSize; 
+	return scaleOfObservation / componentSize; 
 }
 
 double ImageSegmentation::MInt(int c1size, int c2size, cv::Point2i pt)
@@ -189,16 +187,18 @@ int ImageSegmentation::recalculateIntC(std::vector<std::vector<cv::Point2d>> seg
 std::vector<std::vector<cv::Point2d>> ImageSegmentation::segmentation_algorithm(std::vector<std::vector<cv::Point2d>> segmentation, int layer)
 {
 	// sort edges into vector of non-decreasing edge weight, blue layer
-	sortEdgesByEdgeWeight(0); 
+	sortEdgesByEdgeWeight(layer); 
 
+	std::cout << "Before for-loop in segmentation algorithm \n";
 	for (int q = 0; q < edges.size(); q++)
 	{
-		// if the endpoints are not in the same component, pt == (-1, -1) if they are in the same component
+		// if they are not in the same component, pt will contain the indexes of vector segmentation of the components where the points are located
 		cv::Point2i pt = inSame(segmentation, edges[q].endpoints[0], edges[q].endpoints[1]);
+		// if they are not in the same component, pt == (-1, -1) if they are in the same component
 		if (pt != cv::Point2i(-1, -1) && edges[q].weights[layer] <= MInt(static_cast<int>(segmentation[pt.x].size()), static_cast<int>(segmentation[pt.y].size()), pt))
 		{
 			// if we get all the way here we want to merge the components in pt
-			auto comparison = [layer](cv::Point2d pt1, cv::Point2d pt2)->bool
+			auto comparison = [](cv::Point2d pt1, cv::Point2d pt2)->bool
 			{
 				return (pt1.x < pt2.x || (pt1.x == pt2.x && pt1.y < pt2.y));
 			};
@@ -210,28 +210,37 @@ std::vector<std::vector<cv::Point2d>> ImageSegmentation::segmentation_algorithm(
 			intC[pt.x] = recalculateIntC(segmentation, pt.x, layer);
 		}
 	}
-
-	//return a vector of sets of points
-	std::vector<std::vector<cv::Point2d>> randomCrap;
-	return randomCrap;
+	std::cout << "Segmented a layer! \n";
+	return segmentation;
 }
 
 // returns a list of sets of points (vertex positions) S = (C1, C2, C3, C4 ...), return S 
 std::vector<std::vector<cv::Point2d>> ImageSegmentation::segment(cv::Mat img, std::vector<edge> edges)
 {
-	// do segmentation algorithm of each of the three images
-
-	std::vector<std::vector<std::vector<cv::Point2d>>> segmentations; 
+	// do segmentation algorithm of each of the three imagesst
 	segmentationB = segmentation_algorithm(segmentationB, 0);
 	segmentationG = segmentation_algorithm(segmentationG, 1);
 	segmentationR = segmentation_algorithm(segmentationR, 2);
-	
-	// make intersection function
 
+	std::cout << "Done with the segmentation in the three layers! \n";
+	std::cout << "Size of segmentationB: " << segmentationB.size() << "\n" << "Size of segmentationG: " << segmentationG.size() << "\n" << "Size of segmentationR: " << segmentationR.size() << "\n";
+	
+	std::vector<std::vector<cv::Point2d>> finalSegmentation(edges.size(), emptyVec); 
+	/*
+	std::vector<std::vector<cv::Point2d>>::iterator it;
+
+	// make intersection function
+	auto comparison = [](cv::Point2d pt1, cv::Point2d pt2)->bool
+	{
+		return (pt1.x < pt2.x || (pt1.x == pt2.x && pt1.y < pt2.y));
+	};
+	it = std::set_intersection(segmentationB.begin(), segmentationB.end(), segmentationG.begin(), segmentationG.end(), finalSegmentation.begin(), comparison);
+	//std::set_intersection(finalSegmentation.begin(), finalSegmentation.end(), segmentationR.begin(), segmentationR.end(), finalSegmentation.begin(), comparison); 
+	finalSegmentation.resize(it - finalSegmentation.begin());
+	*/ 
 	// do the intersection of the three segmentations -> final segmentation
 	// return final segmentation
-	segmentations.push_back(segmentationB);
-	return segmentations[0];
+	return finalSegmentation;
 }
 
 void ImageSegmentation::colour_img(cv::Mat img, std::vector<std::vector<cv::Point2d>> segmentation)
@@ -241,15 +250,15 @@ void ImageSegmentation::colour_img(cv::Mat img, std::vector<std::vector<cv::Poin
 
 int main()
 {
-	cv::Mat img = cv::imread("orange_flower_small.jpg");
+	cv::Mat img = cv::imread("tiny_pic.png");
 	cv::Mat imgBlurred; 
 
 	std::cout << "Loaded image \n";
 	
 	// do gaussian blur on img here, 0.8 factor
-	cv::GaussianBlur(img, imgBlurred, cv::Size(3, 3), 0.8, 0, cv::BORDER_DEFAULT);
-	cv::imshow("Original image", img);
-	cv::imshow("Blurred image", imgBlurred);
+	cv::GaussianBlur(img, imgBlurred, cv::Size(1, 1), 0.8, 0, cv::BORDER_DEFAULT);
+	/*cv::imshow("Original image", img);
+	cv::imshow("Blurred image", imgBlurred);*/
 
 	// create an array of edges
 	ImageSegmentation segmentation(imgBlurred); 
