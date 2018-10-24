@@ -146,7 +146,7 @@ cv::Point2i ImageSegmentation::inSame(std::vector<std::vector<cv::Point2d>> segm
 	}
 
 	// they are in the same component
-	if (pt1Found == pt2Found != size)
+	if (pt1Found == pt2Found && pt1Found != size && pt2Found != size)
 		return cv::Point2i(-1, -1);
 	// they are in disjoint components
 	else
@@ -170,15 +170,24 @@ int ImageSegmentation::recalculateIntC(std::vector<std::vector<cv::Point2d>> seg
 	{
 		// for each element in the current component do the following: 
 
+		//std::cout << "1 \n";
 		std::vector<edge>::iterator edgeIt;
 		// for finding the element where edges.endpoint[0] = *it
-		for (edgeIt = edges.begin(); edgeIt != edges.end(); ++edgeIt)
-			if (edgeIt->endpoints[0] == *it)
-				break;
+		for (edgeIt = edges.begin(); edgeIt != edges.end() && edgeIt->endpoints[0] != *it; ++edgeIt);
 		// edgeIt pekar nu på det första elementet i edges som har .endpoints[0] lika med den punkten i komponenten vi studerar just nu
-		// den går bara in till if-satsen om första ändpunkten är densamma som punkten vi tittar på just nu och om bägge ändpunkterna är i samma komponent och om dess vikt är större än maxIntC
-		for (int i = 0; (edgeIt + i)->endpoints[0] != *it && inSame(segmentation, (edgeIt + i)->endpoints[0], (edgeIt + i)->endpoints[1]) == cv::Point2i(-1, -1) && maxIntC < (edgeIt + i)->weights[layer]; i++)
-			maxIntC = (edgeIt + i)->weights[layer];
+		
+		//if (edgeIt == edges.end())
+		//	std::cout << "no occurence in edges \n";
+
+		// den går bara in till for-loopen om första ändpunkten är densamma som punkten vi tittar på just nu och om bägge ändpunkterna är i samma komponent och om dess vikt är större än maxIntC
+		for (int i = 0; (edgeIt + i) != edges.end() && (edgeIt + i)->endpoints[0] == *it; i++)
+		{
+			//std::cout << "maxIntC = " << maxIntC << " (edgeIt + i)->weights[layer] = " << (edgeIt + i)->weights[layer] << "\n";
+			//std::cout << "inSame = " << inSame(segmentation, (edgeIt + i)->endpoints[0], (edgeIt + i)->endpoints[1]) << "\n";
+			if(inSame(segmentation, (edgeIt + i)->endpoints[0], (edgeIt + i)->endpoints[1]) == cv::Point2i(-1, -1) && maxIntC < (edgeIt + i)->weights[layer])
+				maxIntC = (edgeIt + i)->weights[layer];
+			//std::cout << "3 \n";
+		}
 		// alla kanter som börjar i *it har nu jämförts 
 	}
 	return maxIntC;
@@ -189,28 +198,39 @@ std::vector<std::vector<cv::Point2d>> ImageSegmentation::segmentation_algorithm(
 	// sort edges into vector of non-decreasing edge weight, blue layer
 	sortEdgesByEdgeWeight(layer); 
 
+	int insideIf = 0;
+
 	std::cout << "Before for-loop in segmentation algorithm \n";
 	for (int q = 0; q < edges.size(); q++)
 	{
 		// if they are not in the same component, pt will contain the indexes of vector segmentation of the components where the points are located
 		cv::Point2i pt = inSame(segmentation, edges[q].endpoints[0], edges[q].endpoints[1]);
 		// if they are not in the same component, pt == (-1, -1) if they are in the same component
+		//std::cout << "pt = " << pt << "\n";
+		//if(pt != cv::Point2i(-1, -1))
+			//std::cout << "segmentation[pt.x].size() = " << segmentation[pt.x].size() << " segmentation[pt.y].size() = " << segmentation[pt.y].size() << "\n";
 		if (pt != cv::Point2i(-1, -1) && edges[q].weights[layer] <= MInt(static_cast<int>(segmentation[pt.x].size()), static_cast<int>(segmentation[pt.y].size()), pt))
 		{
+			insideIf++;
 			// if we get all the way here we want to merge the components in pt
 			auto comparison = [](cv::Point2d pt1, cv::Point2d pt2)->bool
 			{
 				return (pt1.x < pt2.x || (pt1.x == pt2.x && pt1.y < pt2.y));
 			};
-			std::merge(segmentation[pt.x].begin(), segmentation[pt.x].end(), segmentation[pt.y].begin(), segmentation[pt.y].end(), segmentation[pt.x].begin(), comparison);
+			cv::Point2d tempPt(-1, -1);
+			std::vector<cv::Point2d> tempVec(segmentation[pt.x].size() + segmentation[pt.y].size(), tempPt);
+			std::merge(segmentation[pt.x].begin(), segmentation[pt.x].end(), segmentation[pt.y].begin(), segmentation[pt.y].end(), tempVec.begin(), comparison);
+			segmentation[pt.x].swap(tempVec);
 			// erase segmentation[pt.y] AND intC[pt.y]
 			segmentation.erase(segmentation.begin() + pt.y);
 			intC.erase(intC.begin() + pt.y);
+			//std::cout << "erased intC part \n";
 			// recalculate intC[pt.x]
 			intC[pt.x] = recalculateIntC(segmentation, pt.x, layer);
+			//std::cout << "recalculated intC \n";
 		}
 	}
-	std::cout << "Segmented a layer! \n";
+	std::cout << "Segmented a layer! insideIf = " << insideIf << "\n";
 	return segmentation;
 }
 
@@ -226,7 +246,9 @@ std::vector<std::vector<cv::Point2d>> ImageSegmentation::segment(cv::Mat img, st
 	std::cout << "Size of segmentationB: " << segmentationB.size() << "\n" << "Size of segmentationG: " << segmentationG.size() << "\n" << "Size of segmentationR: " << segmentationR.size() << "\n";
 	
 	std::vector<std::vector<cv::Point2d>> finalSegmentation(edges.size(), emptyVec); 
-	/*
+	
+	// running this far didn't give an error
+
 	std::vector<std::vector<cv::Point2d>>::iterator it;
 
 	// make intersection function
@@ -237,7 +259,7 @@ std::vector<std::vector<cv::Point2d>> ImageSegmentation::segment(cv::Mat img, st
 	it = std::set_intersection(segmentationB.begin(), segmentationB.end(), segmentationG.begin(), segmentationG.end(), finalSegmentation.begin(), comparison);
 	//std::set_intersection(finalSegmentation.begin(), finalSegmentation.end(), segmentationR.begin(), segmentationR.end(), finalSegmentation.begin(), comparison); 
 	finalSegmentation.resize(it - finalSegmentation.begin());
-	*/ 
+	
 	// do the intersection of the three segmentations -> final segmentation
 	// return final segmentation
 	return finalSegmentation;
