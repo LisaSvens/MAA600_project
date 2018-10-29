@@ -32,7 +32,7 @@ public:
 	std::vector<cv::Point2i> emptyVec; 
 	std::vector<int> intC; 
 	std::vector<int> compInd; 
-	double scaleOfObservation = 100.0; // = k, large k causes a preference for large components
+	double scaleOfObservation = 55.0; // = k, large k causes a preference for large components
 
 	std::vector<std::vector<cv::Point2i>> segment(cv::Mat img, std::vector<edge> edges);
 	cv::Mat colour_img(cv::Mat img, const std::vector<std::vector<cv::Point2i>>& segmentation);
@@ -300,9 +300,9 @@ std::vector<std::vector<cv::Point2i>> ImageSegmentation::segment(cv::Mat img, st
 	cv::Mat greenPart = colour_img(img, segmentationG);
 	cv::Mat redPart = colour_img(img, segmentationR);
 
-	cv::imwrite("bluePart", bluePart);
-	cv::imwrite("greenPart", greenPart);
-	cv::imwrite("redPart", redPart);
+	cv::imwrite("bluePart.jpg", bluePart);
+	cv::imwrite("greenPart.jpg", greenPart);
+	cv::imwrite("redPart.jpg", redPart);
 
 	cv::namedWindow("blue", cv::WINDOW_NORMAL);
 	cv::imshow("blue", bluePart);
@@ -346,7 +346,7 @@ int main()
 
 	std::cout << "Loaded image \n";
 
-	cv::resize(img, imgSmaller, cv::Size2i(0, 0), 0.6, 0.6);
+	cv::resize(img, imgSmaller, cv::Size2i(0, 0), 0.2, 0.2);
 
 	cv::namedWindow("resized", cv::WINDOW_NORMAL);
 	cv::imshow("resized", imgSmaller); 
